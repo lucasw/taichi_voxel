@@ -12,7 +12,6 @@ from sensor_msgs.msg import Image
 
 import __main__
 
-VOXEL_DX = 1 / 64
 SCREEN_RES = (1280, 720)
 TARGET_FPS = 30
 UP_DIR = (0, 1, 0)
@@ -116,14 +115,15 @@ class Camera:
 
 
 class Scene:
-    def __init__(self, voxel_edges=0.06, exposure=3):
+    def __init__(self, voxel_dx=0.01, voxel_edges=0.06, exposure=3):
+        rospy.init_node("taichi_voxels")
         ti.init(arch=ti.vulkan)
         print(HELP_MSG)
         self.window = ti.ui.Window("Taichi Voxel Renderer",
                                    SCREEN_RES,
                                    vsync=True)
         self.camera = Camera(self.window, up=UP_DIR)
-        self.renderer = Renderer(dx=VOXEL_DX,
+        self.renderer = Renderer(dx=voxel_dx,
                                  image_res=SCREEN_RES,
                                  up=UP_DIR,
                                  voxel_edges=voxel_edges,
@@ -162,7 +162,6 @@ class Scene:
         self.renderer.background_color[None] = color
 
     def finish(self):
-        rospy.init_node("taichi_voxels")
         self.image_pub = rospy.Publisher("image", Image, queue_size=3)
 
         self.renderer.recompute_bbox()
