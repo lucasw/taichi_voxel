@@ -1,12 +1,16 @@
-import time
 import os
+import time
 from datetime import datetime
-import numpy as np
-import taichi as ti
-from renderer import Renderer
-from math_utils import np_normalize, np_rotate_matrix
-import __main__
 
+import numpy as np
+import ros_numpy
+import rospy
+import taichi as ti
+from math_utils import np_normalize, np_rotate_matrix
+from renderer import Renderer
+from sensor_msgs.msg import Image
+
+import __main__
 
 VOXEL_DX = 1 / 64
 SCREEN_RES = (1280, 720)
@@ -22,6 +26,7 @@ Camera:
 
 MAT_LAMBERTIAN = 1
 MAT_LIGHT = 2
+
 
 class Camera:
     def __init__(self, window, up):
@@ -157,10 +162,13 @@ class Scene:
         self.renderer.background_color[None] = color
 
     def finish(self):
+        rospy.init_node("taichi_voxels")
+        self.image_pub = rospy.Publisher("image", Image, queue_size=3)
+
         self.renderer.recompute_bbox()
         canvas = self.window.get_canvas()
         spp = 1
-        while self.window.running:
+        while self.window.running:  # and not rospy.is_shutdown():
             should_reset_framebuffer = False
 
             if self.camera.update_camera():
@@ -175,15 +183,20 @@ class Scene:
             t = time.time()
             for _ in range(spp):
                 self.renderer.accumulate()
-            img = self.renderer.fetch_image()
+            image = self.renderer.fetch_image()
+            if self.image_pub is not None:
+                image_np = (np.flip(np.swapaxes(image.to_numpy(), 0, 1), 0).clip(0.0, 1.0) * 255.0).astype(np.uint8)
+                image_msg = ros_numpy.msgify(Image, image_np, encoding="rgb8")
+                image_msg.header.stamp = rospy.Time.now()
+                self.image_pub.publish(image_msg)
             if self.window.is_pressed('p'):
                 timestamp = datetime.today().strftime('%Y-%m-%d-%H%M%S')
                 dirpath = os.getcwd()
                 main_filename = os.path.split(__main__.__file__)[1]
                 fname = os.path.join(dirpath, 'screenshot', f"{main_filename}-{timestamp}.jpg")
-                ti.tools.image.imwrite(img, fname)
+                ti.tools.image.imwrite(image, fname)
                 print(f"Screenshot has been saved to {fname}")
-            canvas.set_image(img)
+            canvas.set_image(image)
             elapsed_time = time.time() - t
             if elapsed_time * TARGET_FPS > 1:
                 spp = int(spp / (elapsed_time * TARGET_FPS) - 1)
