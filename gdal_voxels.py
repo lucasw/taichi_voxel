@@ -72,6 +72,12 @@ def initialize_voxels(color_bands: ti.types.ndarray(), height_band: ti.types.nda
         color_vec = vec3(r, g, b)
         scene.set_voxel(pos, 1, color_vec)
 
+        pos = ivec3(yi - y0, zk - 1, xj - x0)
+        scene.set_voxel(pos, 1, color_vec)
+
+        pos = ivec3(yi - y0, zk - 2, xj - x0)
+        scene.set_voxel(pos, 1, color_vec)
+
 
 initialize_voxels(color_bands, height_band)
 scene.finish()
